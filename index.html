@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Phoenix Phonics — CVC Words</title>
+<style>
+  :root {
+    --a: #f8a5b8; --e: #7ec9b0; --i: #7fc4e8; --o: #c9a0dc; --u: #e8c85a;
+    --bg: #fdf6ec; --ink: #3a3a3a; --shadow: rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg); color: var(--ink);
+    display: flex; flex-direction: column; min-height: 100vh;
+    overscroll-behavior: none;
+  }
+  header {
+    text-align: center; padding: 18px 12px 8px;
+  }
+  header h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: .3px; }
+  header p { margin: 4px 0 0; font-size: 13px; color: #8a8a8a; }
+
+  main { flex: 1; padding: 12px 14px 90px; }
+
+  /* ---- group grid ---- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .card {
+    border: none; border-radius: 22px; padding: 22px 14px;
+    color: #fff; text-align: center; cursor: pointer;
+    box-shadow: 0 6px 14px var(--shadow); transition: transform .08s;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .card:active { transform: scale(.96); }
+  .card .vowel { font-size: 40px; font-weight: 900; line-height: 1; }
+  .card .eg { font-size: 15px; opacity: .95; font-weight: 600; }
+  .card .cnt { font-size: 11px; opacity: .85; background: rgba(255,255,255,.25);
+    padding: 2px 10px; border-radius: 20px; margin-top: 4px; }
+  .grid .card:last-child { grid-column: 1 / -1; }
+
+  /* ---- word view ---- */
+  .word-header { text-align: center; margin-bottom: 6px; }
+  .word-header .badge {
+    display: inline-block; font-size: 26px; font-weight: 900; color: #fff;
+    padding: 6px 22px; border-radius: 20px; box-shadow: 0 4px 10px var(--shadow);
+    cursor: pointer;
+  }
+  .word-header .badge:active { transform: scale(.95); }
+  .words { display: flex; flex-direction: column; gap: 16px; margin-top: 16px; }
+  .wcard {
+    background: #fff; border-radius: 20px; padding: 18px 16px 20px;
+    box-shadow: 0 4px 12px var(--shadow); text-align: center;
+  }
+  .wword {
+    font-size: 46px; font-weight: 900; letter-spacing: 2px; margin: 0 0 12px;
+    cursor: pointer; display: inline-block;
+  }
+  .wword:active { transform: scale(.95); }
+  .ipa { font-size: 20px; color: #7a7a7a; margin: -4px 0 6px; font-weight: 600;
+    font-family: "Segoe UI", "Lucida Grande", sans-serif; }
+  .zh { font-size: 19px; color: #5a5a5a; margin: 0 0 14px; font-weight: 600; }
+  .phon { display: flex; justify-content: center; gap: 10px; margin-bottom: 6px; }
+  .sentence { font-size: 16px; color: #4a4a4a; margin: 14px 8px 4px; line-height: 1.4;
+    cursor: pointer; background: #f7f2ea; border-radius: 12px; padding: 10px 12px; }
+  .sentence:active { transform: scale(.98); }
+  .ph {
+    font-size: 30px; font-weight: 800; color: #fff;
+    min-width: 46px; padding: 8px 4px; border-radius: 14px; cursor: pointer;
+    box-shadow: 0 3px 7px var(--shadow); transition: transform .08s;
+  }
+  .ph:active { transform: scale(.9); }
+  .hint { font-size: 12px; color: #9a9a9a; margin-top: 10px; }
+  .speaker { font-size: 15px; color: #b56; margin-left: 8px; }
+
+  /* ---- bottom bar ---- */
+  .bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; gap: 12px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(253,246,236,.95); backdrop-filter: blur(6px);
+    border-top: 1px solid #eee;
+  }
+  .bar button {
+    flex: 1; border: none; border-radius: 16px; padding: 15px;
+    font-size: 17px; font-weight: 700; color: #fff; cursor: pointer;
+    box-shadow: 0 4px 10px var(--shadow);
+  }
+  .bar button:active { transform: scale(.97); }
+  .btn-back { background: #b0a89c; }
+  .btn-refresh { background: #ef8b6a; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🦅 Phoenix Phonics</h1>
+  <p id="subtitle">Choose a short-vowel sound</p>
+</header>
+
+<main>
+  <div id="groupView" class="grid"></div>
+  <div id="wordView" class="hidden">
+    <div class="word-header"><span id="groupBadge" class="badge"></span></div>
+    <div id="words" class="words"></div>
+  </div>
+</main>
+
+<div id="bar" class="bar hidden">
+  <button class="btn-back" onclick="showGroups()">← Back</button>
+  <button class="btn-refresh" onclick="refreshWords()">↻ Refresh</button>
+</div>
+
+<script>
+/* ---------- data ---------- */
+/* word lists aligned with https://www.cvc-words.com/cvc-word-lists.html */
+const GROUPS = [
+  { key:'a', vowel:'/a/', color:'var(--a)', eg:'map',
+    words:['bad','bag','bat','cap','cat','dad','fan','fat','gap','ham','hat','jam','lap','mad','man','map','nap','pan','pat','rag','ran','rat','sad','sat','tag','tap','van','wag','yam','zap'] },
+  { key:'e', vowel:'/e/', color:'var(--e)', eg:'pen',
+    words:['bed','beg','bet','den','fed','get','hem','hen','jet','led','leg','let','men','met','net','peg','pen','pet','red','set','ten','web','wet','yes'] },
+  { key:'i', vowel:'/i/', color:'var(--i)', eg:'pig',
+    words:['big','bin','bit','dig','dim','dip','fin','fit','him','hip','hit','kid','kit','lid','lip','lit','mix','nip','pig','pin','pit','rib','rid','rip','sip','sit','tin','tip','wig','win','zip'] },
+  { key:'o', vowel:'/o/', color:'var(--o)', eg:'mop',
+    words:['bob','bog','box','cob','cod','cog','cop','cot','dog','dot','fog','fox','god','got','hop','hot','job','jog','log','lot','mob','mop','nod','not','pod','pop','pot','rob','rod','rot','sob','top'] },
+  { key:'u', vowel:'/u/', color:'var(--u)', eg:'cup',
+    words:['bug','bun','bus','but','cup','cut','dug','fun','gum','gun','gut','hug','hum','hut','jug','lug','mud','mug','mum','nut','pup','run','rut','sub','sum','sun','tub','tug'] },
+];
+
+/* ---------- IPA pronunciation (regular CVC: consonant · short-vowel · consonant) ---------- */
+const IPA_C = { b:'b', c:'k', d:'d', f:'f', g:'ɡ', h:'h', j:'dʒ', k:'k', l:'l',
+  m:'m', n:'n', p:'p', r:'r', s:'s', t:'t', v:'v', w:'w', x:'ks', y:'j', z:'z' };
+const IPA_V = { a:'æ', e:'ɛ', i:'ɪ', o:'ɒ', u:'ʌ' };
+function toIPA(word){
+  return '/' + word.split('').map(ch =>
+    (ch in IPA_V) ? IPA_V[ch] : (IPA_C[ch] || ch)
+  ).join('') + '/';
+}
+const WORDS_PER_SET = 5;
+
+/* letter -> phoneme sound hint for TTS (short, clear sounds) */
+const PHONEME = {
+  a:'ah', e:'eh', i:'ih', o:'aw', u:'uh',
+  b:'buh', c:'kuh', d:'duh', f:'ff', g:'guh', h:'huh', j:'juh', k:'kuh',
+  l:'luh', m:'mm', n:'nn', p:'puh', r:'rr', s:'sss', t:'tuh', v:'vuh',
+  w:'wuh', x:'ks', z:'zz'
+};
+
+/* ---------- word meaning (zh) + example sentence ---------- */
+const WORD_INFO = {
+  "bad":{zh:"坏的",s:"This is a bad dog."},
+  "bag":{zh:"袋子",s:"I have a red bag."},
+  "bat":{zh:"蝙蝠/球棒",s:"The bat can fly."},
+  "cap":{zh:"帽子",s:"He has a blue cap."},
+  "cat":{zh:"猫",s:"The cat is cute."},
+  "dad":{zh:"爸爸",s:"My dad is tall."},
+  "fan":{zh:"风扇/扇子",s:"Turn on the fan."},
+  "fat":{zh:"胖的",s:"The pig is fat."},
+  "gap":{zh:"缝隙",s:"Mind the gap."},
+  "ham":{zh:"火腿",s:"I eat ham and eggs."},
+  "hat":{zh:"帽子",s:"She wears a big hat."},
+  "jam":{zh:"果酱",s:"I like jam on bread."},
+  "lap":{zh:"大腿/膝上",s:"The cat sits on my lap."},
+  "mad":{zh:"生气的",s:"Do not be mad."},
+  "man":{zh:"男人",s:"The man is kind."},
+  "map":{zh:"地图",s:"We look at the map."},
+  "nap":{zh:"小睡",s:"The baby takes a nap."},
+  "pan":{zh:"平底锅",s:"Eggs are in the pan."},
+  "pat":{zh:"轻拍",s:"Pat the dog softly."},
+  "rag":{zh:"抹布",s:"Wipe it with a rag."},
+  "ran":{zh:"跑(过去式)",s:"He ran very fast."},
+  "rat":{zh:"老鼠",s:"The rat is small."},
+  "sad":{zh:"伤心的",s:"Do not be sad."},
+  "sat":{zh:"坐(过去式)",s:"She sat on the mat."},
+  "tag":{zh:"标签",s:"Look at the price tag."},
+  "tap":{zh:"轻敲/水龙头",s:"Tap the door twice."},
+  "van":{zh:"货车",s:"The van is big."},
+  "wag":{zh:"摇摆",s:"Dogs wag their tails."},
+  "yam":{zh:"山药/红薯",s:"I eat a sweet yam."},
+  "zap":{zh:"电击/快速击打",s:"Zap the bug away."},
+  "bed":{zh:"床",s:"I sleep in my bed."},
+  "beg":{zh:"乞求",s:"The dog begs for food."},
+  "bet":{zh:"打赌",s:"I bet you can do it."},
+  "den":{zh:"兽穴/小房间",s:"The fox is in its den."},
+  "fed":{zh:"喂(过去式)",s:"She fed the cat."},
+  "get":{zh:"得到",s:"Get the ball, please."},
+  "hem":{zh:"衣服的褶边",s:"The hem is too long."},
+  "hen":{zh:"母鸡",s:"The hen lays eggs."},
+  "jet":{zh:"喷气机",s:"The jet flies high."},
+  "led":{zh:"带领(过去式)",s:"He led the way."},
+  "leg":{zh:"腿",s:"My leg is strong."},
+  "let":{zh:"让",s:"Let me help you."},
+  "men":{zh:"男人们",s:"Two men are here."},
+  "met":{zh:"遇见(过去式)",s:"I met my friend."},
+  "net":{zh:"网",s:"Catch fish with a net."},
+  "peg":{zh:"挂钩/衣夹",s:"Hang it on the peg."},
+  "pen":{zh:"钢笔",s:"Write with a pen."},
+  "pet":{zh:"宠物",s:"I have a pet dog."},
+  "red":{zh:"红色",s:"The apple is red."},
+  "set":{zh:"一套/放置",s:"Set the cup down."},
+  "ten":{zh:"十",s:"I have ten toes."},
+  "web":{zh:"网/蜘蛛网",s:"The spider spins a web."},
+  "wet":{zh:"湿的",s:"The grass is wet."},
+  "yes":{zh:"是的",s:"Yes, I can do it."},
+  "big":{zh:"大的",s:"The elephant is big."},
+  "bin":{zh:"垃圾桶",s:"Put trash in the bin."},
+  "bit":{zh:"一点/咬(过去式)",s:"Eat a little bit."},
+  "dig":{zh:"挖",s:"Dogs dig in the dirt."},
+  "dim":{zh:"昏暗的",s:"The light is dim."},
+  "dip":{zh:"蘸/浸",s:"Dip the bread in milk."},
+  "fin":{zh:"鳍",s:"The fish has a fin."},
+  "fit":{zh:"合身/健康",s:"This shoe fits me."},
+  "him":{zh:"他",s:"Give it to him."},
+  "hip":{zh:"臀部",s:"Put hands on your hip."},
+  "hit":{zh:"打/击中",s:"Do not hit the ball hard."},
+  "kid":{zh:"小孩",s:"The kid is happy."},
+  "kit":{zh:"成套工具",s:"Open the tool kit."},
+  "lid":{zh:"盖子",s:"Close the lid."},
+  "lip":{zh:"嘴唇",s:"My lip is dry."},
+  "lit":{zh:"点亮(过去式)",s:"She lit the candle."},
+  "mix":{zh:"混合",s:"Mix the flour and egg."},
+  "nip":{zh:"轻咬",s:"The crab may nip you."},
+  "pig":{zh:"猪",s:"The pig is pink."},
+  "pin":{zh:"别针",s:"Pin the paper up."},
+  "pit":{zh:"坑/核",s:"The peach has a pit."},
+  "rib":{zh:"肋骨",s:"I hurt my rib."},
+  "rid":{zh:"摆脱",s:"Get rid of the trash."},
+  "rip":{zh:"撕",s:"Do not rip the page."},
+  "sip":{zh:"小口喝",s:"Sip the hot tea."},
+  "sit":{zh:"坐",s:"Please sit down."},
+  "tin":{zh:"锡罐",s:"The tin is full."},
+  "tip":{zh:"尖端/小费",s:"The tip is sharp."},
+  "wig":{zh:"假发",s:"She wears a wig."},
+  "win":{zh:"赢",s:"We can win the game."},
+  "zip":{zh:"拉链",s:"Zip up your coat."},
+  "bob":{zh:"上下晃动/鲍勃",s:"The duck bobs in water."},
+  "bog":{zh:"沼泽",s:"The bog is wet and soft."},
+  "box":{zh:"盒子",s:"Put toys in the box."},
+  "cob":{zh:"玉米棒芯",s:"I eat corn on the cob."},
+  "cod":{zh:"鳕鱼",s:"Cod is a big fish."},
+  "cog":{zh:"齿轮",s:"The cog turns the wheel."},
+  "cop":{zh:"警察",s:"The cop helps us."},
+  "cot":{zh:"小床",s:"The baby is in a cot."},
+  "dog":{zh:"狗",s:"The dog can run."},
+  "dot":{zh:"点",s:"Draw a small dot."},
+  "fog":{zh:"雾",s:"The fog is thick."},
+  "fox":{zh:"狐狸",s:"The fox is red."},
+  "god":{zh:"神",s:"People pray to god."},
+  "got":{zh:"得到(过去式)",s:"I got a new toy."},
+  "hop":{zh:"单脚跳",s:"Rabbits hop high."},
+  "hot":{zh:"热的",s:"The soup is hot."},
+  "job":{zh:"工作",s:"She has a good job."},
+  "jog":{zh:"慢跑",s:"We jog in the park."},
+  "log":{zh:"原木",s:"Sit on the big log."},
+  "lot":{zh:"许多",s:"I have a lot of toys."},
+  "mob":{zh:"人群",s:"A mob filled the street."},
+  "mop":{zh:"拖把",s:"Mop the wet floor."},
+  "nod":{zh:"点头",s:"Nod if you agree."},
+  "not":{zh:"不",s:"This is not mine."},
+  "pod":{zh:"豆荚",s:"Peas are in a pod."},
+  "pop":{zh:"砰的响/汽水",s:"The balloon goes pop."},
+  "pot":{zh:"锅",s:"Soup is in the pot."},
+  "rob":{zh:"抢劫",s:"Do not rob people."},
+  "rod":{zh:"杆/竿",s:"He holds a fishing rod."},
+  "rot":{zh:"腐烂",s:"The old fruit will rot."},
+  "sob":{zh:"啜泣",s:"The baby began to sob."},
+  "top":{zh:"顶部/陀螺",s:"The bird is on top."},
+  "bug":{zh:"虫子",s:"The bug is on a leaf."},
+  "bun":{zh:"小圆面包",s:"I eat a soft bun."},
+  "bus":{zh:"公共汽车",s:"The bus is yellow."},
+  "but":{zh:"但是",s:"I am small but strong."},
+  "cup":{zh:"杯子",s:"Drink from the cup."},
+  "cut":{zh:"切",s:"Cut the cake, please."},
+  "dug":{zh:"挖(过去式)",s:"The dog dug a hole."},
+  "fun":{zh:"有趣",s:"We have fun today."},
+  "gum":{zh:"口香糖/牙龈",s:"Do not eat gum."},
+  "gun":{zh:"枪",s:"The gun is a toy."},
+  "gut":{zh:"肠道/勇气",s:"It takes guts to try."},
+  "hug":{zh:"拥抱",s:"Give mom a hug."},
+  "hum":{zh:"哼唱",s:"She hums a song."},
+  "hut":{zh:"小屋",s:"We rest in the hut."},
+  "jug":{zh:"水壶",s:"The jug holds milk."},
+  "lug":{zh:"用力拖",s:"Lug the box inside."},
+  "mud":{zh:"泥",s:"The pig likes mud."},
+  "mug":{zh:"马克杯",s:"The mug is hot."},
+  "mum":{zh:"妈妈",s:"My mum is nice."},
+  "nut":{zh:"坚果",s:"The squirrel eats a nut."},
+  "pup":{zh:"小狗",s:"The pup is playful."},
+  "run":{zh:"跑",s:"I can run fast."},
+  "rut":{zh:"车辙/沟",s:"The cart hit a rut."},
+  "sub":{zh:"潜艇/替补",s:"The sub goes deep."},
+  "sum":{zh:"总和",s:"What is the sum?"},
+  "sun":{zh:"太阳",s:"The sun is bright."},
+  "tub":{zh:"浴盆",s:"The baby is in the tub."},
+  "tug":{zh:"用力拉",s:"Tug the rope hard."},
+};
+
+
+/* ---------- progress (localStorage) ---------- */
+const STORE_KEY = 'phoenix_phonics_counts';
+function loadCounts(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch(e){ return {}; } }
+function saveCounts(c){ try { localStorage.setItem(STORE_KEY, JSON.stringify(c)); } catch(e){} }
+let counts = loadCounts();
+function bump(word){ counts[word] = (counts[word]||0) + 1; saveCounts(counts); }
+function groupTotal(g){ return g.words.reduce((s,w)=> s + (counts[w]||0), 0); }
+
+/* ---------- weighted pick: least-practiced words favored ---------- */
+function pickWords(group, n){
+  const maxC = Math.max(0, ...group.words.map(w=>counts[w]||0));
+  // weight = (maxC - count + 1); unseen/low-count words get higher weight
+  const pool = group.words.map(w => ({ w, weight: (maxC - (counts[w]||0) + 1) }));
+  const chosen = [];
+  const avail = [...pool];
+  while (chosen.length < n && avail.length){
+    const total = avail.reduce((s,x)=>s+x.weight,0);
+    let r = Math.random() * total;
+    let idx = 0;
+    for (; idx < avail.length; idx++){ r -= avail[idx].weight; if (r <= 0) break; }
+    if (idx >= avail.length) idx = avail.length - 1;
+    chosen.push(avail[idx].w);
+    avail.splice(idx,1);
+  }
+  return chosen;
+}
+
+/* ---------- speech ---------- */
+let voice = null;
+/* known female English voice names across iOS / macOS / Chrome / Android */
+const FEMALE_HINT = /(female|samantha|karen|moira|tessa|fiona|serena|allison|susan|zira|catherine|hazel|kate|amelie|victoria|ava|joanna|salli|kimberly|google uk english female|google us english)/i;
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  const en = vs.filter(v=>/^en/i.test(v.lang));
+  const gb = en.filter(v=>/en[-_]GB/i.test(v.lang));
+  const us = en.filter(v=>/en[-_]US/i.test(v.lang));
+  const female = list => list.find(v=>FEMALE_HINT.test(v.name) || /female/i.test(v.name));
+  voice = female(gb) || female(us) || female(en) ||
+          gb[0] || us[0] || en[0] || null;
+}
+if ('speechSynthesis' in window){
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+function makeUtter(text, rate){
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = (voice && voice.lang) || 'en-GB';
+  if (voice) u.voice = voice;
+  u.rate = rate || 0.85;
+  u.pitch = 1.05;
+  return u;
+}
+let lastSpeakText = '', lastSpeakTime = 0;
+function speak(text, rate){
+  if (!('speechSynthesis' in window)) return;
+  const now = Date.now();
+  // guard: ignore an identical repeat within 350ms (mobile touch+click / TTS double-fire)
+  if (text === lastSpeakText && (now - lastSpeakTime) < 350) return;
+  lastSpeakText = text; lastSpeakTime = now;
+  speechSynthesis.cancel();
+  speechSynthesis.speak(makeUtter(text, rate));
+}
+/* speak a sequence of {text,rate} parts one after another, with a gap */
+function speakSequence(parts){
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  let i = 0;
+  function next(){
+    if (i >= parts.length) return;
+    const part = parts[i++];
+    const u = makeUtter(part.text, part.rate);
+    u.onend = () => setTimeout(next, part.gap != null ? part.gap : 250);
+    speechSynthesis.speak(u);
+  }
+  next();
+}
+
+/* single letter sound (phonics): vowel or consonant */
+function letterSound(letter){ return PHONEME[letter] || letter; }
+
+/* tap the word (🔊): say the whole word only */
+function speakWord(w){ bump(w); speak(w, 0.75); }
+/* tap a single letter: just its phonics sound */
+function speakPhoneme(letter){ speak(letterSound(letter), 0.6); }
+
+/* ---------- rendering ---------- */
+const groupView = document.getElementById('groupView');
+const wordView  = document.getElementById('wordView');
+const wordsEl   = document.getElementById('words');
+const badge     = document.getElementById('groupBadge');
+const bar       = document.getElementById('bar');
+const subtitle  = document.getElementById('subtitle');
+let currentGroup = null;
+
+function renderGroups(){
+  groupView.innerHTML = '';
+  GROUPS.forEach(g=>{
+    const b = document.createElement('button');
+    b.className = 'card';
+    b.style.background = g.color;
+    b.innerHTML = `<span class="vowel">${g.vowel}</span>
+                   <span class="eg">as in “${g.eg}”</span>
+                   <span class="cnt">practiced ${groupTotal(g)}×</span>`;
+    b.onclick = ()=> openGroup(g);
+    groupView.appendChild(b);
+  });
+}
+
+function renderWords(list){
+  wordsEl.innerHTML = '';
+  list.forEach(w=>{
+    const card = document.createElement('div');
+    card.className = 'wcard';
+    const phon = w.split('').map(ch=>
+      `<span class="ph" style="background:${currentGroup.color}" data-l="${ch}">${ch}</span>`
+    ).join('');
+    const info = WORD_INFO[w] || { zh:'', s:'' };
+    card.innerHTML = `
+      <div class="wword" data-w="${w}">${w}<span class="speaker">🔊</span></div>
+      <div class="ipa">${toIPA(w)}</div>
+      <div class="zh">${info.zh}</div>
+      <div class="phon">${phon}</div>
+      <div class="sentence" data-s="${info.s.replace(/"/g,'&quot;')}">${info.s} 🔊</div>
+      <div class="hint">tap a letter for its sound · tap the word or sentence to hear it</div>`;
+    card.querySelector('.wword').onclick = ()=> speakWord(w);
+    card.querySelectorAll('.ph').forEach(p=>{
+      p.onclick = ()=> speakPhoneme(p.dataset.l);
+    });
+    const sEl = card.querySelector('.sentence');
+    if (info.s) sEl.onclick = ()=> speak(info.s, 0.8);
+    wordsEl.appendChild(card);
+  });
+}
+
+/* ---------- navigation ---------- */
+function openGroup(g){
+  currentGroup = g;
+  badge.textContent = g.vowel;
+  badge.style.background = g.color;
+  badge.onclick = ()=> speakPhoneme(g.key);
+  subtitle.textContent = `Short ${g.vowel} — tap to listen`;
+  groupView.classList.add('hidden');
+  wordView.classList.remove('hidden');
+  bar.classList.remove('hidden');
+  renderWords(pickWords(g, WORDS_PER_SET));
+}
+function refreshWords(){
+  if (currentGroup) renderWords(pickWords(currentGroup, WORDS_PER_SET));
+}
+function showGroups(){
+  currentGroup = null;
+  subtitle.textContent = 'Choose a short-vowel sound';
+  wordView.classList.add('hidden');
+  bar.classList.add('hidden');
+  groupView.classList.remove('hidden');
+  renderGroups();
+}
+
+renderGroups();
+</script>
+</body>
+</html>
