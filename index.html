@@ -378,10 +378,21 @@ function speakSequence(parts){
 /* single letter sound (phonics): vowel or consonant */
 function letterSound(letter){ return PHONEME[letter] || letter; }
 
-/* tap the word (🔊): say the whole word only */
-function speakWord(w){ bump(w); speak(w, 0.75); }
-/* tap a single letter: just its phonics sound */
-function speakPhoneme(letter){ speak(letterSound(letter), 0.6); }
+/* bundled audio player (accurate, device-independent, consistent human/espeak recordings) */
+let clipAudio = null;
+function playClip(src, fallbackText, fallbackRate){
+  if (!clipAudio) clipAudio = new Audio();
+  try { speechSynthesis && speechSynthesis.cancel(); } catch(e){}
+  clipAudio.pause();
+  clipAudio.src = src;
+  const p = clipAudio.play();
+  if (p && p.catch) p.catch(()=> speak(fallbackText, fallbackRate)); // fallback to TTS
+}
+
+/* tap the word (🔊): play the bundled word recording (human, or espeak where missing) */
+function speakWord(w){ bump(w); playClip('audio/words/' + w + '.mp3', w, 0.75); }
+/* tap a single letter: play the accurate bundled phonics sound */
+function speakPhoneme(letter){ playClip('audio/letters/' + letter + '.mp3', letterSound(letter), 0.6); }
 
 /* ---------- rendering ---------- */
 const groupView = document.getElementById('groupView');
